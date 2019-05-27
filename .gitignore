@@ -76,3 +76,7 @@ test_reports_nounits/
 
 # OSX
 .DS_Store
+
+# virtualenv
+python2env/
+python3env/
