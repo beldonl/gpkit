@@ -156,10 +156,10 @@ class BinarySweepTree(object):
             - each solution's 'program' attribute is removed
 
         Solution can then be loaded with e.g.:
-        >>> import cPickle as pickle
+        >>> import pickle
         >>> pickle.load(open("autosweep.p"))
         """
-        import cPickle as pickle
+        import pickle
         programs = []
         costs = []
         for sol in self.sollist:

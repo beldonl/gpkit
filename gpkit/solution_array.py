@@ -2,7 +2,7 @@
 from __future__ import print_function
 import re
 from collections import Iterable
-import cPickle as pickle
+import pickle
 import numpy as np
 from .nomials import NomialArray
 from .small_classes import DictOfLists, Strings
@@ -442,7 +442,7 @@ class SolutionArray(DictOfLists):
                 (the "message" field is preserved)
 
         Solution can then be loaded with e.g.:
-        >>> import cPickle as pickle
+        >>> import pickle
         >>> pickle.load(open("solution.pkl"))
         """
         program, model, cost, warnings = self.pickle_prep()

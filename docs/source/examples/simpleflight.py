@@ -1,6 +1,6 @@
 "Minimizes airplane drag for a simple drag and structure model."
 from __future__ import print_function
-import cPickle as pickle
+import pickle
 import numpy as np
 from gpkit import Variable, Model
 pi = np.pi

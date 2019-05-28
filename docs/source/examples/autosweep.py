@@ -1,6 +1,6 @@
 "Show autosweep_1d functionality"
 from __future__ import print_function
-import cPickle as pickle
+import pickle
 import numpy as np
 import gpkit
 from gpkit import units, Variable, Model

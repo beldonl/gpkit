@@ -1,6 +1,6 @@
 """Modular aircraft concept"""
 from __future__ import print_function
-import cPickle as pickle
+import pickle
 import numpy as np
 from gpkit import Model, Vectorize, parse_variables
 
