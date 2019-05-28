@@ -7,7 +7,8 @@ def appendsolwarning(msg, data, result, category="uncategorized",
                      printwarning=False):
     "Append a particular category of warnings to a solution."
     if printwarning:
-        print "Warning: %s\n" % msg
+        print(f"Warning: {msg}\n")
+        #print "Warning: %s\n" % msg
     if "warnings" not in result:
         result["warnings"] = {}
     if category not in result["warnings"]:
