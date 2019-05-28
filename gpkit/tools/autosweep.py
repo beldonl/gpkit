@@ -1,4 +1,5 @@
 "Tools for optimal fits to GP sweeps"
+from __future__ import print_function
 from time import time
 import numpy as np
 from ..small_classes import Count

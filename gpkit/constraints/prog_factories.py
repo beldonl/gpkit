@@ -1,4 +1,5 @@
 "Scripts for generating, solving and sweeping programs"
+from __future__ import print_function
 from time import time
 import numpy as np
 from ..nomials import parse_subs

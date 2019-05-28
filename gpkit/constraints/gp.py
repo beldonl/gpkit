@@ -1,4 +1,5 @@
 """Implement the GeometricProgram class"""
+from __future__ import print_function
 import sys
 from time import time
 from collections import defaultdict

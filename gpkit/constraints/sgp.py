@@ -1,4 +1,5 @@
 """Implement the SequentialGeometricProgram class"""
+from __future__ import print_function
 from time import time
 from ..exceptions import InvalidGPConstraint
 from ..keydict import KeyDict

@@ -1,4 +1,7 @@
 """Assorted helper methods"""
+from __future__ import print_function
+from builtins import str
+from builtins import object
 from collections import Iterable
 import numpy as np
 
@@ -7,8 +10,7 @@ def appendsolwarning(msg, data, result, category="uncategorized",
                      printwarning=False):
     "Append a particular category of warnings to a solution."
     if printwarning:
-        print(f"Warning: {msg}\n")
-        #print "Warning: %s\n" % msg
+        print("Warning: %s\n" % msg)
     if "warnings" not in result:
         result["warnings"] = {}
     if category not in result["warnings"]:
