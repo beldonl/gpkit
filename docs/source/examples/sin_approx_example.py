@@ -1,4 +1,5 @@
 "Can be found in gpkit/docs/source/examples/sin_approx_example.py"
+from __future__ import print_function
 import numpy as np
 from gpkit import Variable, Model
 
@@ -14,4 +15,4 @@ constraints = [y >= x,
               ]
 
 m = Model(objective, constraints)
-print m.solve(verbosity=0).summary()
+print(m.solve(verbosity=0).summary())

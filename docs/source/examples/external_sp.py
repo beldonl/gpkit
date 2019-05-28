@@ -1,4 +1,5 @@
 "Can be found in gpkit/docs/source/examples/external_sp.py"
+from __future__ import print_function
 
 import numpy as np
 from gpkit import Variable, Model
@@ -15,4 +16,4 @@ constraints = [ExternalConstraint(x, y),
               ]
 
 m = Model(objective, constraints)
-print m.localsolve(verbosity=0).summary()
+print(m.localsolve(verbosity=0).summary())

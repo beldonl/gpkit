@@ -1,4 +1,5 @@
 """Defines SolutionArray class"""
+from __future__ import print_function
 import re
 from collections import Iterable
 import cPickle as pickle

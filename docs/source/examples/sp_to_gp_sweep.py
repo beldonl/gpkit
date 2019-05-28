@@ -1,4 +1,5 @@
 "example of an SP that turns into a GP"
+from __future__ import print_function
 import numpy as np
 from gpkit import Model, Variable, SignomialsEnabled, units
 from gpkit.constraints.tight import Tight
@@ -104,4 +105,4 @@ sa = SimPleAC()
 sa.substitutions.update({"V_f_wing": ("sweep", np.linspace(0.1, 0.5, 3)),
                          "V_f_fuse": 0.5})
 sol = sa.solve(verbosity=0)
-print sol.summary()
+print(sol.summary())

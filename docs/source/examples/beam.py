@@ -2,6 +2,7 @@
 A simple beam example with fixed geometry. Solves the discretized
 Euler-Bernoulli beam equations for a constant distributed load
 """
+from __future__ import print_function
 import numpy as np
 from gpkit import Variable, VectorVariable, Model, ureg
 from gpkit.small_scripts import mag
@@ -62,7 +63,7 @@ class Beam(Model):
 
 b = Beam(N=6, substitutions={"L": 6, "EI": 1.1e4, "q": 110*np.ones(6)})
 sol = b.solve(verbosity=0)
-print sol.summary(maxcolumns=6)
+print(sol.summary(maxcolumns=6))
 w_gp = sol("w")  # deflection along beam
 
 L, EI, q = sol("L"), sol("EI"), sol("q")

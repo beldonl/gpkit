@@ -1,4 +1,5 @@
 "verifies that bounds are caught through monomials"
+from __future__ import print_function
 from gpkit import Model, parse_variables
 
 
@@ -29,7 +30,7 @@ class BoundsChecking(Model):
 
     """
     def setup(self):
-        exec parse_variables(BoundsChecking.__doc__)
+        exec(parse_variables(BoundsChecking.__doc__))
         self.cost = F
         return [
             F >= D + T,
@@ -43,7 +44,7 @@ class BoundsChecking(Model):
 
 
 m = BoundsChecking()
-print m.str_without(["models"])
+print(m.str_without(["models"]))
 try:
     m.solve()
 except ValueError:

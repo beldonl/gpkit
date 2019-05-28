@@ -1,4 +1,5 @@
 """Adapted from t_SP in tests/t_geometric_program.py"""
+from __future__ import print_function
 import gpkit
 
 # Decision variables
@@ -11,5 +12,5 @@ with gpkit.SignomialsEnabled():
 
 # create and solve the SP
 m = gpkit.Model(x, constraints)
-print m.localsolve(verbosity=0).summary()
+print(m.localsolve(verbosity=0).summary())
 assert abs(m.solution(x) - 0.9) < 1e-6

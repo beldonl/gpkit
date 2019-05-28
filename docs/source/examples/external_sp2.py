@@ -1,4 +1,5 @@
 "Can be found in gpkit/docs/source/examples/external_sp2.py"
+from __future__ import print_function
 import numpy as np
 from gpkit import Variable, Model
 
@@ -14,4 +15,4 @@ def y_ext(self, x0):
 y = Variable("y", externalfn=y_ext)
 
 m = Model(y, [np.pi/4 <= x, x <= np.pi/2])
-print m.localsolve(verbosity=0).summary()
+print(m.localsolve(verbosity=0).summary())

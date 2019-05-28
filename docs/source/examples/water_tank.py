@@ -1,4 +1,5 @@
 "Minimizes cylindrical tank surface area for a particular volume."
+from __future__ import print_function
 from gpkit import Variable, VectorVariable, Model
 
 M = Variable("M", 100, "kg", "Mass of Water in the Tank")
@@ -13,4 +14,4 @@ constraints = (A >= 2*(d[0]*d[1] + d[0]*d[2] + d[1]*d[2]),
 
 m = Model(A, constraints)
 sol = m.solve(verbosity=0)
-print sol.summary()
+print(sol.summary())

@@ -1,4 +1,5 @@
 "Very simple problem: minimize x while keeping x greater than 1."
+from __future__ import print_function
 from gpkit import Variable, Model
 
 # Decision variable

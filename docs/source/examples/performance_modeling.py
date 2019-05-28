@@ -1,4 +1,5 @@
 """Modular aircraft concept"""
+from __future__ import print_function
 import cPickle as pickle
 import numpy as np
 from gpkit import Model, Vectorize, parse_variables
@@ -24,7 +25,7 @@ class AircraftP(Model):
     def setup(self, aircraft, state):
         self.aircraft = aircraft
         self.state = state
-        exec parse_variables(AircraftP.__doc__)
+        exec(parse_variables(AircraftP.__doc__))
 
         self.wing_aero = aircraft.wing.dynamic(aircraft.wing, state)
         self.perf_models = [self.wing_aero]
@@ -63,7 +64,7 @@ class Aircraft(Model):
     wing.c, wing.S
     """
     def setup(self):
-        exec parse_variables(Aircraft.__doc__)
+        exec(parse_variables(Aircraft.__doc__))
         self.fuse = Fuselage()
         self.wing = Wing()
         self.components = [self.fuse, self.wing]
@@ -88,7 +89,7 @@ class FlightState(Model):
 
     """
     def setup(self):
-        exec parse_variables(FlightState.__doc__)
+        exec(parse_variables(FlightState.__doc__))
 
 
 class FlightSegment(Model):
@@ -168,7 +169,7 @@ class WingAero(Model):
     def setup(self, wing, state):
         self.wing = wing
         self.state = state
-        exec parse_variables(WingAero.__doc__)
+        exec(parse_variables(WingAero.__doc__))
 
         c = wing.c
         A = wing.A
@@ -206,7 +207,7 @@ class Wing(Model):
     c, S
     """
     def setup(self):
-        exec parse_variables(Wing.__doc__)
+        exec(parse_variables(Wing.__doc__))
         return {"parametrization of wing weight":
                     W >= S*rho,
                 "definition of mean chord":
@@ -226,7 +227,7 @@ class Fuselage(Model):
 
     """
     def setup(self):
-        exec parse_variables(Fuselage.__doc__)
+        exec(parse_variables(Fuselage.__doc__))
 
 
 AC = Aircraft()
@@ -243,8 +244,8 @@ assert (MISSION["flight segment"]["aircraft performance"]
         is MISSION.fs.aircraftp)
 vars_of_interest.update(MISSION.fs.aircraftp.unique_varkeys)
 vars_of_interest.add(M["D"])
-print sol.summary(vars_of_interest)
-print sol.table(tables=["loose constraints"])
+print(sol.summary(vars_of_interest))
+print(sol.table(tables=["loose constraints"]))
 
 MISSION["flight segment"]["aircraft performance"]["fuel burn rate"] = (
     MISSION.fs.aircraftp.Wburn >= 0.2*MISSION.fs.aircraftp.wing_aero.D)
