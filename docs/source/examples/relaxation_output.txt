@@ -19,14 +19,14 @@ With constraints relaxed equally
 
 Cost
 ----
- 1.414
+ 1.189
 
 Free Variables
 --------------
-x : 1.414
+x : 1.189
 
   | Relax
-C : 1.414
+C : 1.189
 
 Constants
 ---------
@@ -35,13 +35,13 @@ x_min : 2
 
 Sensitivities
 -------------
-x_min : +0.5
 x_max : -0.5
+x_min : +0.25
 
 Tightest Constraints
 --------------------
   +0.5 : x <= C_Relax*x_max
-  +0.5 : x_min <= C_Relax*x
+ +0.25 : x_min <= C_Relax*x
 
 
 With constraints relaxed individually
@@ -56,14 +56,14 @@ With constraints relaxed individually
 
 Cost
 ----
- 2
+ 1.414
 
 Free Variables
 --------------
 x : 1
 
   | Relax.1
-C : [ 1         2        ]
+C : [ 1         1.41     ]
 
 Constants
 ---------
@@ -72,14 +72,13 @@ x_min : 2
 
 Sensitivities
 -------------
-x_min : +1
 x_max : -0.99
+x_min : +0.5
 
 Tightest Constraints
 --------------------
-    +1 : x_min <= C_Relax.1_(1,)*x
  +0.99 : x <= C_Relax.1_(0,)*x_max
- +0.01 : C_Relax.1_(0,) >= 1
+  +0.5 : x_min <= C_Relax.1_(1,)*x
 
 
 With constants relaxed individually
@@ -90,26 +89,26 @@ With constants relaxed individually
   # subject to
         x <= x_max
         x >= x_min
-        x_max_Relax.2 >= 1
-        x_max >= x_max_Relax.2**-1*x_max_{before}_Relax.2
-        x_max <= x_max_Relax.2*x_max_{before}_Relax.2
         x_min_Relax.2 >= 1
         x_min >= x_min_Relax.2**-1*x_min_{before}_Relax.2
         x_min <= x_min_Relax.2*x_min_{before}_Relax.2
+        x_max_Relax.2 >= 1
+        x_max >= x_max_Relax.2**-1*x_max_{before}_Relax.2
+        x_max <= x_max_Relax.2*x_max_{before}_Relax.2
 
 Cost
 ----
- 2
+ 1.419
 
 Free Variables
 --------------
-    x : 1
-x_max : 1
-x_min : 1
+    x : 1.414
+x_max : 1.414
+x_min : 2
 
       | Relax.2
-x_max : 1
-x_min : 2
+x_max : 1.414
+x_min : 1
 
 Constants
 ---------
@@ -118,14 +117,15 @@ x_min_{before} : 2
 
 Sensitivities
 -------------
-x_min : +1
-x_max : -0.99
+x_max : -1
+x_min : +0.5
 
 Tightest Constraints
 --------------------
-    +1 : x >= x_min
-    +1 : x_min >= x_min_Relax.2**-1*x_min_{before}_Relax.2
- +0.99 : x <= x_max
- +0.99 : x_max <= x_max_Relax.2*x_max_{before}_Relax.2
+    +1 : x <= x_max
+    +1 : x_max <= x_max_Relax.2*x_max_{before}_Relax.2
+ +0.51 : x_min >= x_min_Relax.2**-1*x_min_{before}_Relax.2
+  +0.5 : x >= x_min
+ +0.25 : x_min_Relax.2 >= 1
 
 

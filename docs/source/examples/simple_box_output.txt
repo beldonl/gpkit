@@ -1,13 +1,13 @@
 
 Cost
 ----
- 0.003674 [1/m**3]
+ 4e-05 [1/m**3]
 
 Free Variables
 --------------
-d : 8.17   [m] depth
-h : 8.163  [m] height
-w : 4.081  [m] width
+d : 10   [m] depth
+h : 500  [m] height
+w : 5    [m] width
 
 Constants
 ---------
@@ -20,11 +20,13 @@ A_{floor} : 50   [m**2] upper limit, floor area
 
 Sensitivities
 -------------
-A_{wall} : -1.5  upper limit, wall area
-   alpha : +0.5  lower limit, wall aspect ratio
+     beta : -2    upper limit, wall aspect ratio
+A_{floor} : -1.5  upper limit, floor area
+    gamma : +0.5  lower limit, floor aspect ratio
 
 Tightest Constraints
 --------------------
-  +1.5 : A_{wall} >= 2*d*h + 2*h*w
-  +0.5 : alpha <= h*w**-1
+  +1.5 : A_{floor} >= d*w
+    +1 : beta >= h*w**-1
+  +0.5 : gamma <= d*w**-1
 

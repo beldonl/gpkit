@@ -6,7 +6,7 @@ Solves with these variables bounded:
  sensitive to upper bound: y
 
 and these constants relaxed:
-  x_min [ft]: relaxed from 2 to 1
+  x_max [ft]: relaxed from 1 to 1.189
 
 >> Success!
 

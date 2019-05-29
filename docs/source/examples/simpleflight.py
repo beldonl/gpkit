@@ -71,5 +71,5 @@ sweeps = {V_min: ("sweep", np.linspace(20, 25, N)),
 m.substitutions.update(sweeps)
 sweepsol = m.solve(verbosity=0)
 print(sweepsol.summary())
-sol_loaded = pickle.load(open("solution.pkl"))
+sol_loaded = pickle.load(open("solution.pkl", "rb"))
 print(sweepsol.diff(sol_loaded))

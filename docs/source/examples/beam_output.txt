@@ -1,27 +1,28 @@
 
 Cost
 ----
- 1.621 [m]
+ 1.083 [m]
 
 Free Variables
 --------------
     dx : 1.2                                                             [m]   Length of an element
-     M : [ 1.98e+03  1.27e+03  713       317       79.2      0.0002   ]  [N*m] Internal moment
-     V : [ 660       528       396       264       132       0.0002   ]  [N]   Internal shear
-\theta : [ 0.0002    0.177     0.285     0.341     0.363     0.367    ]        Slope
-     w : [ 0.0002    0.107     0.384     0.76      1.18      1.62     ]  [m]   Displacement
+     M : [ 94.6      94.6      13.1      13.1      2.63      0.0002   ]  [N*m] Internal moment
+     V : [ 397       265       133       132       11.5      0.0002   ]  [N]   Internal shear
+\theta : [ 0.0002    0.0105    0.106     0.118     0.119     0.345    ]        Slope
+     w : [ 0.0002    0.185     0.272     0.637     0.872     1.08     ]  [m]   Displacement
 
 Most Sensitive
 --------------
- L : +4                                                             Overall beam length
-EI : -1
- q : [ +0.0072   +0.042    +0.12     +0.23     +0.37     +0.22    ] Distributed load at each point
+            L : +0.54                                                          Overall beam length
+           EI : -0.11
+            q : [  0         0        +0.041    +0.044    +0.0047    0       ] Distributed load at each point
+\theta_{base} : +0.0017                                                        Base angle
 
 Tightest Constraints
 --------------------
-+5.5e+02 : L = 5*dx
-      +1 : w_(5,) >= 0.5*\theta_(4,)*dx + 0.5*\theta_(5,)*dx + w_(4,)
-   +0.74 : \theta_(2,) >= 0.5*EI**-1*M_(1,)*dx + 0.5*EI**-1*M_(2,)*dx + \theta_(1,)
-   +0.73 : w_(4,) >= 0.5*\theta_(3,)*dx + 0.5*\theta_(4,)*dx + w_(3,)
-   +0.64 : M_(1,) >= 0.5*V_(1,)*dx + 0.5*V_(2,)*dx + M_(2,)
+ +0.57 : w_(5,) >= 0.5*\theta_(4,)*dx + 0.5*\theta_(5,)*dx + w_(4,)
+ +0.54 : L = 5*dx
+ +0.23 : w_(4,) >= 0.5*\theta_(3,)*dx + 0.5*\theta_(4,)*dx + w_(3,)
+ +0.13 : \theta_(3,) >= 0.5*EI**-1*M_(2,)*dx + 0.5*EI**-1*M_(3,)*dx + \theta_(2,)
+ +0.11 : \theta_(4,) >= 0.5*EI**-1*M_(3,)*dx + 0.5*EI**-1*M_(4,)*dx + \theta_(3,)
 
