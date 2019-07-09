@@ -157,6 +157,94 @@ class SequentialGeometricProgram(CostedConstraintSet):
                 self[0].insert(0, v.key.externalfn)  # for constraint senss
         return self.result
 
+    # pylint: disable=too-many-locals
+    def localsolveonce(self, solver=None, verbosity=1, x0=None, reltol=1e-4,
+                   iteration_limit=50, mutategp=True, **kwargs):
+        """Locally solves a SequentialGeometricProgram ONCE and returns the solution.
+
+        Arguments
+        ---------
+        solver : str or function (optional)
+            By default uses one of the solvers found during installation.
+            If set to "mosek", "mosek_cli", or "cvxopt", uses that solver.
+            If set to a function, passes that function cs, A, p_idxs, and k.
+        verbosity : int (optional)
+            If greater than 0, prints solve time and number of iterations.
+            Each GP is created and solved with verbosity one less than this, so
+            if greater than 1, prints solver name and time for each GP.
+        x0 : dict (optional)
+            Initial location to approximate signomials about.
+        reltol : float
+            Iteration ends when this is greater than the distance between two
+            consecutive solve's objective values.
+        iteration_limit : int
+            Maximum GP iterations allowed.
+        *args, **kwargs :
+            Passed to solver function.
+
+
+        Returns
+        -------
+        result : dict
+            A dictionary containing the translated solver result.
+        """
+        starttime = time()
+        if verbosity > 0:
+            print("Beginning signomial solve.")
+        self.gps = []  # NOTE: SIDE EFFECTS
+        self.results = []
+        if x0 and mutategp:
+            self._gp = self.init_gp(self.substitutions, x0)
+        slackvar = Variable()
+        prevcost, cost, rel_improvement = None, None, None
+        while (rel_improvement is None or rel_improvement > reltol) and len(self.gps) < iteration_limit:
+            if len(self.gps) > iteration_limit:
+                raise RuntimeWarning("""problem unsolved after %s iterations.
+
+    The last result is available in Model.program.gps[-1].result. If the gps
+    appear to be converging, you may wish to increase the iteration limit by
+    calling .localsolve(..., iteration_limit=NEWLIMIT).""" % len(self.gps))
+            gp = self.gp(x0, mutategp)
+            self.gps.append(gp)  # NOTE: SIDE EFFECTS
+            try:
+                result = gp.solve(solver, verbosity-1,
+                                  warn_on_check=True, **kwargs)
+                self.results.append(result)
+            except (RuntimeWarning, ValueError):
+                feas_constrs = ([slackvar >= 1] +
+                                [posy <= slackvar
+                                 for posy in gp.posynomials[1:]])
+                primal_feas = GeometricProgram(slackvar**100 * gp.cost,
+                                               feas_constrs, None)
+                self.gps.append(primal_feas)
+                result = primal_feas.solve(solver, verbosity-1, **kwargs)
+                result["cost"] = None  # reset the cost-counting
+            x0 = result["freevariables"]
+            prevcost, cost = cost, result["cost"]
+            if prevcost is None or cost is None:
+                rel_improvement = None
+            elif prevcost < (1-reltol)*cost:
+                print("SP is not converging! Last GP iteration had a higher"
+                      " cost (%.2g) than the previous one (%.2g). Results for"
+                      " each iteration are in (Model).program.results. If your"
+                      " model contains SignomialEqualities, note that"
+                      " convergence is not guaranteed: try replacing any"
+                      " SigEqs you can and solving again." % (cost, prevcost))
+            else:
+                rel_improvement = abs(prevcost-cost)/(prevcost + cost)
+        # solved successfully!
+        soltime = time() - starttime
+        if verbosity > 0:
+            print("Solving took %i GP solves" % len(self.gps)
+                  + " and %.3g seconds." % soltime)
+        self.process_result(result)
+        self.result = SolutionArray(result.copy())  # NOTE: SIDE EFFECTS
+        self.result["soltime"] = soltime
+        if self.externalfn_vars:
+            for v in self.externalfn_vars:
+                self[0].insert(0, v.key.externalfn)  # for constraint senss
+        return self.result
+
     def _fill_x0(self, x0):
         "Returns a copy of x0 with subsitutions and sp_inits added."
         x0 = KeyDict(x0) if x0 else KeyDict()
@@ -231,3 +319,5 @@ class SequentialGeometricProgram(CostedConstraintSet):
             gp = GeometricProgram(self.cost, gp_constrs, self.substitutions)
             gp.x0 = x0  # NOTE: SIDE EFFECTS
             return gp
+
+    
