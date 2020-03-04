@@ -15,7 +15,7 @@ class TestSolutionArray(unittest.TestCase):
         A = Variable('A', '-', 'Test Variable')
         prob = Model(A, [A >= 1])
         sol = prob.solve(verbosity=0)
-        self.assertAlmostEqual(sol(A), 1.0, 10)
+        self.assertAlmostEqual(sol(A), 1.0, 8)
 
     def test_call_units(self):
         # test from issue541
@@ -35,7 +35,8 @@ class TestSolutionArray(unittest.TestCase):
         self.assertEqual(type(solx), Quantity)
         self.assertEqual(type(sol["variables"][x]), np.ndarray)
         self.assertEqual(solx.shape, (n,))
-        self.assertTrue((abs(solx - 2.5*np.ones(n)) < 1e-7).all())
+        for i in range(n):
+            self.assertAlmostEqual(solx[i], 2.5, places=4)
 
     def test_subinto(self):
         Nsweep = 20
@@ -99,7 +100,7 @@ class TestResultsTable(unittest.TestCase):
     def test_nan_printing(self):
         """Test that solution prints when it contains nans"""
         x = VarKey(name='x')
-        data = {x: np.array([np.nan, 1., 1., 1., 1.])}
+        data = {x: np.array([np.nan, 1, 1, 1, 1])}
         title = "Free variables"
         printstr = "\n".join(var_table(data, title))
         self.assertTrue(" - " in printstr)  # nan is printed as " - "

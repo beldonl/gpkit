@@ -1,13 +1,7 @@
 "GP and SP modeling package"
-__version__ = "0.8.0"
-
 from .build import build
-from ._pint import units, ureg, DimensionalityError
-from .globals import settings
-from .globals import SignomialsEnabled, SIGNOMIALS_ENABLED
-from .globals import Vectorize, VECTORIZATION
-from .globals import (NamedVariables, MODELS, MODELNUMS, MODELNUM_LOOKUP,
-                      NAMEDVARS, reset_modelnumbers)
+from .units import units, ureg, DimensionalityError
+from .globals import settings, SignomialsEnabled, Vectorize, NamedVariables
 from .varkey import VarKey
 from .nomials import Monomial, Posynomial, Signomial, NomialArray
 from .nomials import VectorizableVariable as Variable
@@ -19,13 +13,14 @@ from .constraints.sigeq import SignomialEquality
 from .constraints.set import ConstraintSet
 from .constraints.model import Model
 from .tools.docstring import parse_variables
+from .tests.run_tests import run as run_unit_tests
 
-GPBLU = "#59ade4"
+__version__ = "1.0.0pre"
 GPCOLORS = ["#59ade4", "#FA3333"]
+GPBLU, GPRED = GPCOLORS
 
 if "just built!" in settings:
-    from .tests.run_tests import run
-    run(verbosity=1)
+    run_unit_tests(verbosity=1)
     print("""
 GPkit is now installed with solver(s) %s
 To incorporate new solvers at a later date, run `gpkit.build()`.

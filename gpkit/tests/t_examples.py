@@ -1,8 +1,8 @@
 """Unit testing of tests in docs/source/examples"""
 import unittest
 import os
+import pickle
 import numpy as np
-import cPickle as pickle
 
 from gpkit import settings
 from gpkit.tests.helpers import generate_example_tests
@@ -10,6 +10,8 @@ from gpkit.small_scripts import mag
 from gpkit.small_classes import Quantity
 from gpkit.constraints.loose import Loose
 from gpkit import Model
+from gpkit.exceptions import (UnknownInfeasible,
+                              PrimalInfeasible, DualInfeasible, UnboundedGP)
 
 
 def assert_logtol(first, second, logtol=1e-6):
@@ -90,43 +92,67 @@ class TestExamples(unittest.TestCase):
         sol.table()
         sol.save("solution.pkl")
         sol.table()
-        sol_loaded = pickle.load(open("solution.pkl"))
+        sol_loaded = pickle.load(open("solution.pkl", "rb"))
         sol_loaded.table()
 
         sweepsol = m.sweep({example.AC.fuse.W: (50, 100, 150)}, verbosity=0)
         sweepsol.table()
         sweepsol.save("sweepsolution.pkl")
         sweepsol.table()
-        sol_loaded = pickle.load(open("sweepsolution.pkl"))
+        sol_loaded = pickle.load(open("sweepsolution.pkl", "rb"))
         sol_loaded.table()
 
     def test_sp_to_gp_sweep(self, example):
         pass
 
     def test_boundschecking(self, example):
-        pass
+        if "mosek_cli" != settings["default_solver"]:
+            example.gp.solve(verbosity=0)  # mosek_conif can solve it!
+        else:
+            with self.assertRaises(UnknownInfeasible):
+                example.gp.solve(verbosity=0)
 
     def test_vectorize(self, example):
         pass
 
     def test_primal_infeasible_ex1(self, example):
-        with self.assertRaises(RuntimeWarning) as cm:
+        primal_or_unknown = PrimalInfeasible
+        if "cvxopt" in settings["default_solver"]:
+            primal_or_unknown = UnknownInfeasible
+        with self.assertRaises(primal_or_unknown):
             example.m.solve(verbosity=0)
-        err = cm.exception
-        if "mosek" in err.message:
-            self.assertIn("PRIM_INFEAS_CER", err.message)
-        elif "cvxopt" in err.message:
-            self.assertIn("unknown", err.message)
 
     def test_primal_infeasible_ex2(self, example):
-        with self.assertRaises(RuntimeWarning):
+        primal_or_unknown = PrimalInfeasible
+        if "cvxopt" in settings["default_solver"]:
+            primal_or_unknown = UnknownInfeasible
+        with self.assertRaises(primal_or_unknown):
             example.m.solve(verbosity=0)
 
     def test_docstringparsing(self, example):
         pass
 
     def test_debug(self, example):
-        pass
+        dual_or_primal = DualInfeasible
+        if "mosek_conif" == settings["default_solver"]:
+            dual_or_primal = PrimalInfeasible
+        with self.assertRaises(UnboundedGP):
+            example.m.gp()
+        with self.assertRaises(dual_or_primal):
+            gp = example.m.gp(allow_missingbounds=True)
+            gp.solve(verbosity=0)
+
+        primal_or_unknown = PrimalInfeasible
+        if "cvxopt" == settings["default_solver"]:
+            primal_or_unknown = UnknownInfeasible
+        with self.assertRaises(primal_or_unknown):
+            example.m2.solve(verbosity=0)
+
+        with self.assertRaises(UnboundedGP):
+            example.m3.gp()
+        with self.assertRaises(DualInfeasible):
+            gp3 = example.m3.gp(allow_missingbounds=True)
+            gp3.solve(verbosity=0)
 
     def test_simple_sp(self, example):
         pass
@@ -184,7 +210,7 @@ class TestExamples(unittest.TestCase):
                 sol_rat = mag(sol["variables"][key])/freevarcheck[key]
                 self.assertTrue(abs(1-sol_rat) < 1e-2)
             for key in senscheck:
-                sol_rat = sol["sensitivities"]["constants"][key]/senscheck[key]
+                sol_rat = sol["sensitivities"]["variables"][key]/senscheck[key]
                 self.assertTrue(abs(1-sol_rat) < 1e-2)
 
     def test_relaxation(self, example):

@@ -4,7 +4,7 @@ from ..small_scripts import splitsweep
 
 
 def parse_subs(varkeys, substitutions, clean=False):
-    "Seperates subs into constants, sweeps linkedsweeps actually present."
+    "Seperates subs into the constants, sweeps, linkedsweeps actually present."
     constants, sweep, linkedsweep = {}, {}, {}
     if clean:
         for var in varkeys:
@@ -51,16 +51,14 @@ def append_sub(sub, keys, constants, sweep, linkedsweep):
                     raise ValueError("cannot sweep variable %s of shape %s"
                                      " with array of shape %s; array shape"
                                      " must either be %s or %s" %
-                                     (key.str_without("model"), key.shape,
-                                      sub.shape,
+                                     (key.veckey, key.shape, sub.shape,
                                       key.shape, ("N",)+key.shape))
                 idx = (slice(None),)+key.descr["idx"]
                 value = sub[idx]
             else:
                 raise ValueError("cannot substitute array of shape %s for"
                                  " variable %s of shape %s." %
-                                 (sub.shape, key.str_without("model"),
-                                  key.shape))
+                                 (sub.shape, key.veckey, key.shape))
         if hasattr(value, "__call__") and not hasattr(value, "key"):
             linkedsweep[key] = value
         elif sweepsub:

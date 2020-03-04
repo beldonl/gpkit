@@ -1,5 +1,6 @@
 "verifies that bounds are caught through monomials"
 from gpkit import Model, parse_variables
+from gpkit.exceptions import UnboundedGP, UnknownInfeasible
 
 
 class BoundsChecking(Model):
@@ -28,8 +29,8 @@ class BoundsChecking(Model):
     D
 
     """
+    @parse_variables(__doc__, globals())
     def setup(self):
-        exec parse_variables(BoundsChecking.__doc__)
         self.cost = F
         return [
             F >= D + T,
@@ -43,16 +44,21 @@ class BoundsChecking(Model):
 
 
 m = BoundsChecking()
-print m.str_without(["models"])
+print(m.str_without(["lineage"]))
 try:
     m.solve()
-except ValueError:
-    pass
-gp = m.gp(allow_missingbounds=True)
+except UnboundedGP:
+    gp = m.gp(allow_missingbounds=True)
 
-bplate = ", but would gain it from any of these sets of bounds: "
-assert {(m.D.key, 'lower'): bplate + "[(%s, 'lower')]" % m.Ap,
-        (m.Ap.key, 'lower'): bplate + ("[(%s, 'lower')]"
-                                       " or [(%s, 'lower')]" % (m.D, m.nu)),
-        (m.nu.key, 'lower'): bplate + "[(%s, 'lower')]" % m.Ap
-       } == gp.missingbounds
+try:
+    sol = gp.solve(verbosity=0)  # Errors on mosek_cli
+except UnknownInfeasible:
+    pass
+
+bpl = ", but would gain it from any of these sets: "
+assert gp.missingbounds[(m.D.key, 'lower')] == bpl + "[(%s, 'lower')]" % m.Ap
+assert gp.missingbounds[(m.nu.key, 'lower')] == bpl + "[(%s, 'lower')]" % m.Ap
+# ordering is arbitrary:
+assert gp.missingbounds[(m.Ap.key, 'lower')] in (
+    bpl + ("[(%s, 'lower')] or [(%s, 'lower')]" % (m.D, m.nu)),
+    bpl + ("[(%s, 'lower')] or [(%s, 'lower')]" % (m.nu, m.D)))

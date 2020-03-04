@@ -76,3 +76,6 @@ test_reports_nounits/
 
 # OSX
 .DS_Store
+
+# Development environment
+.idea/

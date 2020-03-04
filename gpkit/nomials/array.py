@@ -8,15 +8,14 @@
 
 """
 from operator import eq, le, ge, xor
+from functools import reduce  # pylint: disable=redefined-builtin
 import numpy as np
-from .math import Signomial, HashVector
-from ..small_classes import Numbers, HashVector
+from .map import NomialMap
+from ..small_classes import Numbers, HashVector, EMPTY_HV
 from ..small_scripts import try_str_without, mag
 from ..constraints import ArrayConstraint
-from ..repr_conventions import _str, _repr, _repr_latex_
+from ..repr_conventions import GPkitObject
 from ..exceptions import DimensionalityError
-from .map import NomialMap
-
 
 @np.vectorize
 def vec_recurse(element, function, *args, **kwargs):
@@ -30,16 +29,15 @@ def array_constraint(symbol, func):
 
     def wrapped_func(self, other):
         "Creates array constraint from vectorized operator."
-        if not self.shape:
-            return func(self.flatten()[0], other)
+        if not isinstance(other, NomialArray):
+            other = NomialArray(other)
         result = vecfunc(self, other)
-        left = self.key if hasattr(self, "key") else self
-        right = other.key if hasattr(other, "key") else other
-        return ArrayConstraint(result, left, symbol, right)
+        return ArrayConstraint(result, getattr(self, "key", self),
+                               symbol, getattr(other, "key", other))
     return wrapped_func
 
 
-class NomialArray(np.ndarray):
+class NomialArray(GPkitObject, np.ndarray):
     """A Numpy array with elementwise inequalities and substitutions.
 
     Arguments
@@ -51,83 +49,100 @@ class NomialArray(np.ndarray):
     >>> px = gpkit.NomialArray([1, x, x**2])
     """
 
-    __str__ = _str
-    __repr__ = _repr
-    _repr_latex_ = _repr_latex_
+    def __mul__(self, other, *, reverse_order=False):
+        astorder = (self, other) if not reverse_order else (other, self)
+        out = NomialArray(np.ndarray.__mul__(self, other))
+        out.ast = ("mul", astorder)
+        return out
 
-    def str_without(self, excluded=None):
-        "Returns string without certain fields (such as 'models')."
-        if self.shape:
-            return "[" + ", ".join([try_str_without(el, excluded)
-                                    for el in self]) + "]"
-        return str(self.flatten()[0])  # TODO THIS IS WEIRD
+    def __truediv__(self, other):
+        out = NomialArray(np.ndarray.__truediv__(self, other))
+        out.ast = ("div", (self, other))
+        return out
 
-    def latex(self, matwrap=True):
-        "Returns 1D latex list of contents."
-        if self.ndim == 0:
-            return self.flatten()[0].latex()
-        if self.ndim == 1:
-            return (("\\begin{bmatrix}" if matwrap else "") +
-                    " & ".join(el.latex() for el in self) +
-                    ("\\end{bmatrix}" if matwrap else ""))
-        elif self.ndim == 2:
-            return ("\\begin{bmatrix}" +
-                    " \\\\\n".join(el.latex(matwrap=False) for el in self) +
-                    "\\end{bmatrix}")
-        return None
+    def __rtruediv__(self, other):
+        out = (np.ndarray.__mul__(self**-1, other))
+        out.ast = ("div", (other, self))
+        return out
+
+    def __add__(self, other, *, reverse_order=False):
+        astorder = (self, other) if not reverse_order else (other, self)
+        out = (np.ndarray.__add__(self, other))
+        out.ast = ("add", astorder)
+        return out
+
+    # pylint: disable=multiple-statements
+    def __rmul__(self, other): return self.__mul__(other, reverse_order=True)
+    def __radd__(self, other): return self.__add__(other, reverse_order=True)
+
+    def __pow__(self, expo):  # pylint: disable=arguments-differ
+        out = (np.ndarray.__pow__(self, expo))  # pylint: disable=too-many-function-args
+        out.ast = ("pow", (self, expo))
+        return out
+
+    def __neg__(self):
+        out = (np.ndarray.__neg__(self))
+        out.ast = ("neg", self)
+        return out
+
+    def __getitem__(self, idxs):
+        out = np.ndarray.__getitem__(self, idxs)
+        if not getattr(out, "shape", None):
+            return out
+        out.ast = ("index", (self, idxs))
+        return out
+
+    def str_without(self, excluded=()):
+        "Returns string without certain fields (such as 'lineage')."
+        if self.ast:
+            return self.parse_ast(excluded)
+        if hasattr(self, "key"):
+            return self.key.str_without(excluded)
+        if not self.shape:
+            return try_str_without(self.flatten()[0], excluded)
+
+        return "[%s]" % ", ".join(
+            [try_str_without(np.ndarray.__getitem__(self, i), excluded)
+             for i in range(self.shape[0])])  # pylint: disable=unsubscriptable-object
+
+    def latex(self, excluded=()):
+        "Returns latex representation without certain fields."
+        units = self.latex_unitstr() if "units" not in excluded else ""
+        if hasattr(self, "key"):
+            return self.key.latex(excluded) + units
+        return np.ndarray.__str__(self)
 
     def __hash__(self):
         return reduce(xor, map(hash, self.flat), 0)
 
     def __new__(cls, input_array):
         "Constructor. Required for objects inheriting from np.ndarray."
-        # Input array is an already formed ndarray instance
-        # cast to be our class type
-        obj = np.asarray(input_array).view(cls)
-        return obj
+        # Input is an already formed ndarray instance cast to our class type
+        return np.asarray(input_array).view(cls)
 
     def __array_finalize__(self, obj):
         "Finalizer. Required for objects inheriting from np.ndarray."
-        pass
 
-    def __array_wrap__(self, out_arr, context=None):
+    def __array_wrap__(self, out_arr, context=None):  # pylint: disable=arguments-differ
         """Called by numpy ufuncs.
         Special case to avoid creation of 0-dimensional arrays
         See http://docs.scipy.org/doc/numpy/user/basics.subclassing.html"""
         if out_arr.ndim:
-            return np.ndarray.__array_wrap__(self, out_arr, context)
-        try:
-            val = out_arr.item()
-            return np.float(val) if isinstance(val, np.generic) else val
-        except:
-            print("Something went wrong. I'd like to raise a RuntimeWarning,"
-                  " but you wouldn't see it because numpy seems to catch all"
-                  " Exceptions coming from __array_wrap__.")
-            raise
-
-    def __nonzero__(self):
-        "Allows the use of NomialArrays as truth elements."
-        return all(bool(p) for p in self.flat)
-
-    def __bool__(self):
-        "Allows the use of NomialArrays as truth elements in python3."
-        return all(bool(p) for p in self.flat)
-
-    def vectorize(self, function, *args, **kwargs):
-        "Apply a function to each terminal constraint, returning the array"
-        return vec_recurse(self, function, *args, **kwargs)
+            return np.ndarray.__array_wrap__(self, out_arr, context)  # pylint: disable=too-many-function-args
+        val = out_arr.item()
+        return np.float(val) if isinstance(val, np.generic) else val
 
     __eq__ = array_constraint("=", eq)
     __le__ = array_constraint("<=", le)
     __ge__ = array_constraint(">=", ge)
 
-    def __ne__(self, other):
-        "Does type checking, then applies 'not ==' in a vectorized fashion."
-        return not isinstance(other, self.__class__) or not all(self == other)
-
     def outer(self, other):
         "Returns the array and argument's outer product."
         return NomialArray(np.outer(self, other))
+
+    def vectorize(self, function, *args, **kwargs):
+        "Apply a function to each terminal constraint, returning the array"
+        return vec_recurse(self, function, *args, **kwargs)
 
     def sub(self, subs, require_positive=True):
         "Substitutes into the array"
@@ -137,7 +152,7 @@ class NomialArray(np.ndarray):
     def units(self):
         """units must have same dimensions across the entire nomial array"""
         units = None
-        for el in self.flat:
+        for el in self.flat:  # pylint: disable=not-an-iterable
             el_units = getattr(el, "units", None)
             if units is None:
                 units = el_units
@@ -146,72 +161,46 @@ class NomialArray(np.ndarray):
                 raise DimensionalityError(el_units, units)
         return units
 
-    def padleft(self, padding):
-        "Returns ({padding}, self[0], self[1] ... self[N])"
-        if self.ndim != 1:
-            raise NotImplementedError("unimplemented for ndim=%s" % self.ndim)
-        padded = NomialArray(np.hstack((padding, self)))
-        _ = padded.units  # check that the units are consistent
-        return padded
-
-    def padright(self, padding):
-        "Returns (self[0], self[1] ... self[N], {padding})"
-        if self.ndim != 1:
-            raise NotImplementedError("unimplemented for ndim=%s" % self.ndim)
-        padded = NomialArray(np.hstack((self, padding)))
-        _ = padded.units  # check that the units are consistent
-        return padded
-
-    @property
-    def left(self):
-        "Returns (0, self[0], self[1] ... self[N-1])"
-        return self.padleft(0)[:-1]
-
-    @property
-    def right(self):
-        "Returns (self[1], self[2] ... self[N], 0)"
-        return self.padright(0)[1:]
-
-    def sum(self, *args, **kwargs):
+    def sum(self, *args, **kwargs):  # pylint: disable=arguments-differ
         "Returns a sum. O(N) if no arguments are given."
-        if args or kwargs or all(l == 0 for l in self.shape):
+        if args or kwargs or not self.shape:
             return np.ndarray.sum(self, *args, **kwargs)
         hmap = NomialMap()
         hmap.units = self.units
-        it = np.nditer(self, flags=['multi_index', 'refs_ok'])
-        empty_exp = HashVector()
+        it = np.nditer(self, flags=["multi_index", "refs_ok"])
         while not it.finished:
-            i = it.multi_index
+            m = self[it.multi_index]
             it.iternext()
-            if isinstance(mag(self[i]), Numbers):
-                if mag(self[i]) == 0:
-                    continue
-                else:  # number manually inserted by user
-                    hmap[empty_exp] = mag(self[i]) + hmap.get(HashVector(), 0)
+            if isinstance(mag(m), Numbers):
+                if mag(m):
+                    hmap[EMPTY_HV] = mag(m) + hmap.get(EMPTY_HV, 0)
             else:
-                hmap += self[i].hmap
-        return Signomial(hmap)
+                hmap += m.hmap
+        out = Signomial(hmap)
+        out.ast = ("sum", (self, None))
+        return out
 
-    def prod(self, *args, **kwargs):
+    def prod(self, *args, **kwargs):  # pylint: disable=arguments-differ
         "Returns a product. O(N) if no arguments and only contains monomials."
-        if args or kwargs or all(l == 0 for l in self.shape):
+        if args or kwargs:
             return np.ndarray.prod(self, *args, **kwargs)
         c, unitpower = 1.0, 0
         exp = HashVector()
-        it = np.nditer(self, flags=['multi_index', 'refs_ok'])
+        it = np.nditer(self, flags=["multi_index", "refs_ok"])
         while not it.finished:
-            idx = it.multi_index
+            m = self[it.multi_index]
             it.iternext()
-            m_ = self[idx]
-            if not hasattr(m_, "exp"):  # it's not a monomial, abort!
+            if not hasattr(m, "hmap") and len(m.hmap) == 1:
                 return np.ndarray.prod(self, *args, **kwargs)
-            c = c * mag(m_.c)
+            c *= mag(m.c)
             unitpower += 1
-            for key, value in m_.exp.items():
-                if key in exp:
-                    exp[key] += value
-                else:
-                    exp[key] = value
+            exp += m.exp
         hmap = NomialMap({exp: c})
-        hmap.units = self.units**unitpower if self.units else None
-        return Signomial(hmap)
+        units = self.units
+        hmap.units = units**unitpower if units else None
+        out = Signomial(hmap)
+        out.ast = ("prod", (self, None))
+        return out
+
+
+from .math import Signomial  # pylint: disable=wrong-import-position

@@ -3,7 +3,6 @@ from collections import defaultdict
 import numpy as np
 from .. import Variable
 from .set import ConstraintSet
-from ..small_scripts import mag
 
 
 def varkey_bounds(varkeys, lower, upper):
@@ -27,10 +26,10 @@ def varkey_bounds(varkeys, lower, upper):
             variable.hmap.units = None
             variable.units = None
         constraint = []
-        if upper:
-            constraint.append(upper >= variable)
         if lower:
-            constraint.append(variable >= lower)
+            constraint.append(lower <= variable)
+        if upper:
+            constraint.append(variable <= upper)
         constraints.append(constraint)
     return constraints
 
@@ -43,29 +42,27 @@ class Bounded(ConstraintSet):
     constraints : iterable
         constraints whose varkeys will be bounded
 
-    substitutions : dict
-        as in ConstraintSet.__init__
-
-    verbosity : int
+    verbosity : int (default 1)
         how detailed of a warning to print
             0: nothing
             1: print warnings
 
-    eps : float
+    eps : float (default 1e-30)
         default lower bound is eps, upper bound is 1/eps
 
-    lower : float
+    lower : float (default None)
         lower bound for all varkeys, replaces eps
 
-    upper : float
+    upper : float (default None)
         upper bound for all varkeys, replaces 1/eps
     """
+    sens_threshold = 1e-7
+    logtol_threshold = 3
 
-    def __init__(self, constraints, verbosity=1,
+    def __init__(self, constraints, *, verbosity=1,
                  eps=1e-30, lower=None, upper=None):
         if not isinstance(constraints, ConstraintSet):
             constraints = ConstraintSet(constraints)
-        self.bound_las = None
         self.verbosity = verbosity
         self.lowerbound = lower if (lower or upper) else eps
         self.upperbound = upper if (lower or upper) else 1/eps
@@ -74,58 +71,38 @@ class Bounded(ConstraintSet):
                                        if vk not in constraints.substitutions)
         bounding_constraints = varkey_bounds(self.bound_varkeys,
                                              self.lowerbound, self.upperbound)
-        super(Bounded, self).__init__([constraints, bounding_constraints])
-
-    def sens_from_dual(self, las, nus, result):
-        "Return sensitivities while capturing the relevant lambdas"
-        n = bool(self.lowerbound) + bool(self.upperbound)
-        self.bound_las = las[-n*len(self.bound_varkeys):]
-        return super(Bounded, self).sens_from_dual(las, nus, result)
+        super().__init__({"original constraints": constraints,
+                          "variable bounds": bounding_constraints})
 
     def process_result(self, result):
         "Add boundedness to the model's solution"
         ConstraintSet.process_result(self, result)
         if "boundedness" not in result:
             result["boundedness"] = {}
-        for key, value in self.check_boundaries(result).items():
-            if key not in result["boundedness"]:
-                result["boundedness"][key] = value
-            else:
-                result["boundedness"][key].update(value)
+        result["boundedness"].update(
+            self.check_boundaries(result, verbosity=self.verbosity))
 
-    def check_boundaries(self, result):
+    def check_boundaries(self, result, *, verbosity=0):
         "Creates (and potentially prints) a dictionary of unbounded variables."
         out = defaultdict(set)
         for i, varkey in enumerate(self.bound_varkeys):
-            value = mag(result["variables"][varkey])
-            if self.bound_las:
-                # TODO: support sensitive-to bounds for SPs
-                #       by using named variables, returning las,
-                #       or pulling from self.las?
-                if self.lowerbound and self.upperbound:
-                    lam_gt, lam_lt = self.bound_las[2*i], self.bound_las[2*i+1]
-                elif self.lowerbound:
-                    lam_lt = self.bound_las[i]
-                elif self.upperbound:
-                    lam_gt = self.bound_las[i]
+            value = result["variables"][varkey]
+            c_senss = [result["sensitivities"]["constraints"].get(c, 0)
+                       for c in self["variable bounds"][i]]
             if self.lowerbound:
-                if self.bound_las:
-                    if abs(lam_lt) >= 1e-7:  # arbitrary sens threshold
-                        out["sensitive to lower bound"].add(varkey)
-                distance_below = np.log(value/self.lowerbound)
-                if distance_below <= 3:  # arbitrary dist threshold
+                if c_senss[0] >= self.sens_threshold:
+                    out["sensitive to lower bound"].add(varkey)
+                if np.log(value/self.lowerbound) <= self.logtol_threshold:
                     out["value near lower bound"].add(varkey)
             if self.upperbound:
-                if self.bound_las:
-                    if abs(lam_gt) >= 1e-7:  # arbitrary sens threshold
-                        out["sensitive to upper bound"].add(varkey)
-                distance_above = np.log(self.upperbound/value)
-                if distance_above <= 3:  # arbitrary dist threshold
+                if c_senss[-1] >= self.sens_threshold:
+                    out["sensitive to upper bound"].add(varkey)
+                if np.log(self.upperbound/value) <= self.logtol_threshold:
                     out["value near upper bound"].add(varkey)
-        if self.verbosity > 0 and out:
-            print
-            print "Solves with these variables bounded:"
-            for key, value in out.items():
-                print "% 25s: %s" % (key, ", ".join(map(str, value)))
-            print
+        if verbosity > 0 and out:
+            print("")
+            print("Solves with these variables bounded:")
+            for key, value in sorted(out.items()):
+                print("% 25s: %s" % (key, ", ".join(map(str, value))))
+            print("")
         return out

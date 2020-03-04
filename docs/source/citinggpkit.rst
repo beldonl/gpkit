@@ -1,12 +1,14 @@
 Citing GPkit
 ************
 
-If you use GPkit, please cite it with the following bibtex::
+If you use GPkit please cite it with the following bibtex::
 
-    @Misc{gpkit,
-          author={Edward Burnell and Warren Hoburg},
-          title={GPkit software for geometric programming},
-          howpublished={\url{https://github.com/convexengineering/gpkit}},
-          year={2018},
-          note={Version 0.8.0}
-         }
+    @inproceedings{burnell2020gpkit,
+        author={Burnell, Edward and Damen, Nicole B and Hoburg, Warren},
+        title={\hbox{GPkit}: A Human-Centered Approach to Convex Optimization in Engineering Design},
+        booktitle={Proceedings of the 2020 {CHI} Conference on Human Factors in Computing Systems},
+        year={2020},
+        doi={10.1145/3313831.3376412}
+    }
+
+(and you can read that paper, which describes some of GPkit's design philosophy, `here. <https://convex.mit.edu/publications/GPkit_CHI2020.pdf>`_)

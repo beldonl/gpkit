@@ -12,20 +12,20 @@ class TestKeyDict(unittest.TestCase):
 
     def test_setattr(self):
         kd = KeyDict()
-        x = Variable("x", models=["test"])
+        x = Variable("x", lineage=(("test", 0),))
         kd[x] = 1
         self.assertIn(x, kd)
         self.assertEqual(set(kd), set([x.key]))
 
     def test_getattr(self):
         kd = KeyDict()
-        x = Variable("x", models=["motor"])
+        x = Variable("x", lineage=[("Motor", 0)])
         kd[x] = 52
         self.assertEqual(kd[x], 52)
         self.assertEqual(kd[x.key], 52)
         self.assertEqual(kd["x"], 52)
-        self.assertEqual(kd["x_motor"], 52)
-        self.assertNotIn("x_someothermodelname", kd)
+        self.assertEqual(kd["Motor.x"], 52)
+        self.assertNotIn("x.Someothermodelname", kd)
 
     def test_failed_getattr(self):
         kd = KeyDict()
@@ -38,12 +38,6 @@ class TestKeyDict(unittest.TestCase):
         res = kd["waldo"]
         self.assertEqual(res, 5)
         self.assertIn("waldo", kd)
-
-    def test_dictlike(self):
-        kd = KeyDict()
-        kd["a string key"] = "a string value"
-        self.assertTrue(isinstance(kd, dict))
-        self.assertEqual(kd.keys(), ["a string key"])
 
     def test_vector(self):
         v = VectorVariable(3, "v")

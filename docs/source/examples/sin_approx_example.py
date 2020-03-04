@@ -9,9 +9,9 @@ y = Variable("y")
 objective = y
 
 constraints = [y >= x,
-               x <= np.pi/2.,
-               x >= np.pi/4.,
+               x <= np.pi/2,
+               x >= np.pi/4,
               ]
 
 m = Model(objective, constraints)
-print m.solve(verbosity=0).summary()
+print(m.solve(verbosity=0).summary())

@@ -1,5 +1,4 @@
 "Runs each file listed in pwd/TESTS as a test"
-
 import unittest
 import os
 import re
@@ -9,7 +8,6 @@ from gpkit.tests.helpers import generate_example_tests, new_test
 
 class TestFiles(unittest.TestCase):
     "Stub to be filled with files in $pwd/TESTS"
-    pass
 
 
 def clean(string):
@@ -25,7 +23,7 @@ def clean(string):
 def add_filetest(testclass, path):
     "Add test that imports the given path and runs its test() function"
     path = path.strip()
-    print "adding test for", repr(path)
+    print("adding test for", repr(path))
 
     def test_fn(self):
         top_level = os.getcwd()
@@ -55,6 +53,9 @@ def run(filename="TESTS", xmloutput=False, skipsolvers=None):
     with open(filename, "r") as f:
         for path in f:
             add_filetest(TestFiles, path)
+    if skipsolvers == "look around":
+        from .test_repo import get_settings
+        skipsolvers = get_settings()["skipsolvers"]
     solvers = [s for s in settings["installed_solvers"]
                if not skipsolvers or s not in skipsolvers]
     tests = generate_example_tests("", [TestFiles], solvers,

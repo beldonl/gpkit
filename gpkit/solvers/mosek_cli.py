@@ -5,17 +5,17 @@
     ``result = _mosek.cli_expopt.imize(cs, A, p_idxs, "gpkit_mosek")``
 
 """
-
 import os
 import shutil
 import tempfile
 import errno
 import stat
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from .. import settings
+from ..exceptions import (UnknownInfeasible,
+                          PrimalInfeasible, DualInfeasible)
 
-
-def error_remove_read_only(func, path, exc):
+def remove_read_only(func, path, exc):
     "If we can't remove a file/directory, change permissions and try again."
     if func in (os.rmdir, os.remove) and exc[1].errno == errno.EACCES:
         # change the file to be readable,writable,executable: 0777
@@ -23,7 +23,7 @@ def error_remove_read_only(func, path, exc):
         func(path)  # try again
 
 
-def imize_fn(path=None, clearfiles=True):
+def optimize_generator(path=None, **_):
     """Constructor for the MOSEK CLI solver function.
 
     Arguments
@@ -32,16 +32,15 @@ def imize_fn(path=None, clearfiles=True):
         The directory in which to put the MOSEK CLI input/output files.
         By default uses a system-appropriate temp directory.
     """
-    if not path:
+    tmpdir = path is None
+    if tmpdir:
         path = tempfile.mkdtemp()
     filename = path + os.sep + "gpkit_mosek"
     if "mosek_bin_dir" in settings:
         if settings["mosek_bin_dir"] not in os.environ["PATH"]:
-            os.environ["PATH"] = (os.environ["PATH"]
-                                  + ":" + settings["mosek_bin_dir"])
+            os.environ["PATH"] += ":" + settings["mosek_bin_dir"]
 
-    # pylint: disable=unused-argument
-    def imize(c, A, p_idxs, *args, **kwargs):
+    def optimize(*, c, A, p_idxs, **_):
         """Interface to the MOSEK "mskexpopt" command line solver
 
         Definitions
@@ -83,38 +82,42 @@ def imize_fn(path=None, clearfiles=True):
 
         # run mskexpopt and print stdout
         solution_filename = filename + ".sol"
-        for logline in check_output(["mskexpopt", filename,
-                                     "-sol", solution_filename]).split(b"\n"):
-            print(logline)
+        try:
+            for logline in check_output(["mskexpopt", filename, "-sol",
+                                         solution_filename]).split(b"\n"):
+                print(logline)
+        except CalledProcessError as e:
+            raise UnknownInfeasible() from e
         with open(solution_filename) as f:
-            status = f.readline().split("PROBLEM STATUS      : ")
-            if len(status) != 2:
-                raise RuntimeWarning("could not read mskexpopt output status")
-            status = status[1][:-1]
-            if status == "PRIMAL_AND_DUAL_FEASIBLE":
-                status = "optimal"
-            assert_line(f, "SOLUTION STATUS     : OPTIMAL\n")
+            _, probsta = f.readline().split("PROBLEM STATUS      : ")
+            if probsta == "PRIMAL_INFEASIBLE\n":
+                raise PrimalInfeasible()
+            if probsta == "DUAL_INFEASIBLE\n":
+                raise DualInfeasible()
+            if probsta != "PRIMAL_AND_DUAL_FEASIBLE\n":
+                raise UnknownInfeasible("PROBLEM STATUS: " + probsta[:-1])
+
+            _, solsta = f.readline().split("SOLUTION STATUS     : ")
             # line looks like "OBJECTIVE           : 2.763550e+002"
             objective_val = float(f.readline().split()[2])
-            assert_line(f, "\n")
-            assert_line(f, "PRIMAL VARIABLES\n")
-            assert_line(f, "INDEX   ACTIVITY\n")
+            assert_equal(f.readline(), "\n")
+            assert_equal(f.readline(), "PRIMAL VARIABLES\n")
+            assert_equal(f.readline(), "INDEX   ACTIVITY\n")
             primal_vals = read_vals(f)
             # read_vals reads the dividing blank line as well
-            assert_line(f, "DUAL VARIABLES\n")
-            assert_line(f, "INDEX   ACTIVITY\n")
+            assert_equal(f.readline(), "DUAL VARIABLES\n")
+            assert_equal(f.readline(), "INDEX   ACTIVITY\n")
             dual_vals = read_vals(f)
 
-        if clearfiles:
-            shutil.rmtree(path, ignore_errors=False,
-                          onerror=error_remove_read_only)
+        if tmpdir:
+            shutil.rmtree(path, ignore_errors=False, onerror=remove_read_only)
 
-        return dict(status=status,
+        return dict(status=solsta[:-1],
                     objective=objective_val,
                     primal=primal_vals,
                     nu=dual_vals)
 
-    return imize
+    return optimize
 
 
 def write_output_file(filename, c, A, p_idxs):
@@ -136,9 +139,8 @@ def write_output_file(filename, c, A, p_idxs):
                       for x in zip(A.row, A.col, A.data)])
 
 
-def assert_line(fil, expected):
+def assert_equal(received, expected):
     "Asserts that a file's next line is as expected."
-    received = fil.readline()
     if tuple(expected[:-1].split()) != tuple(received[:-1].split()):
         errstr = repr(expected)+" is not the same as "+repr(received)
         raise RuntimeWarning("could not read mskexpopt output file: "+errstr)

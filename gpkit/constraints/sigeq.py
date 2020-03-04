@@ -1,6 +1,6 @@
 "Implements SignomialEquality"
 from .set import ConstraintSet
-from ..nomials import SingleSignomialEquality
+from ..nomials import SingleSignomialEquality as SSE
 from ..nomials.array import array_constraint
 
 
@@ -8,11 +8,8 @@ class SignomialEquality(ConstraintSet):
     "A constraint of the general form posynomial == posynomial"
 
     def __init__(self, left, right):
-        # TODO: really it should be easier to vectorize a constraint
-        if hasattr(left, "shape"):
-            cns = array_constraint("=", SingleSignomialEquality)(left, right)
-        elif hasattr(right, "shape"):
-            cns = array_constraint("=", SingleSignomialEquality)(right, left)
+        if hasattr(left, "shape") or hasattr(right, "shape"):
+            ConstraintSet.__init__(self,
+                                   array_constraint("=", SSE)(left, right))
         else:
-            cns = [SingleSignomialEquality(left, right)]
-        ConstraintSet.__init__(self, cns)
+            ConstraintSet.__init__(self, [SSE(left, right)])

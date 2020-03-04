@@ -3,7 +3,6 @@ import unittest
 import sys
 import os
 import importlib
-from ..repr_conventions import DEFAULT_UNIT_PRINTING
 
 
 def generate_example_tests(path, testclasses, solvers=None, newtest_fn=None):
@@ -55,19 +54,22 @@ def new_test(name, solver, import_dict, path, testfn=None):
         # No docstring because it'd be uselessly the same for each example
 
         import gpkit
-        # clear MODELNUMS to ensure determinate script-like output!
-        for key in set(gpkit.MODELNUM_LOOKUP):
-            del gpkit.MODELNUM_LOOKUP[key]
-
         with NewDefaultSolver(solver):
-            testfn(name, import_dict, path)(self)
+            try:
+                testfn(name, import_dict, path)(self)
+            except FutureWarning as fw:
+                print(fw)
 
-        # check all other global state besides MODELNUM_LOOKUP
-        #   is falsy (which should mean blank)
-        for globname, global_thing in [("models", gpkit.MODELS),
-                                       ("modelnums", gpkit.MODELNUMS),
-                                       ("vectorization", gpkit.VECTORIZATION),
-                                       ("namedvars", gpkit.NAMEDVARS)]:
+        # clear modelnums to ensure deterministic script-like output!
+        gpkit.globals.NamedVariables.reset_modelnumbers()
+
+        # check all global state is falsy
+        for globname, global_thing in [
+                ("model numbers", gpkit.globals.NamedVariables.modelnums),
+                ("lineage", gpkit.NamedVariables.lineage),
+                ("signomials enabled", gpkit.SignomialsEnabled),
+                ("vectorization", gpkit.Vectorize.vectorization),
+                ("namedvars", gpkit.NamedVariables.namedvars)]:
             if global_thing:
                 raise ValueError("global attribute %s should have been"
                                  " falsy after the test, but was instead %s"
@@ -91,7 +93,7 @@ def logged_example_testcase(name, imported, path):
             if name not in imported:
                 imported[name] = importlib.import_module(name)
             else:
-                reload(imported[name])
+                importlib.reload(imported[name])
         getattr(self, name)(imported[name])
     return test
 
@@ -119,18 +121,16 @@ def run_tests(tests, xmloutput=None, verbosity=2):
         unittest.TextTestRunner(verbosity=verbosity).run(suite)
 
 
-class NullFile(object):
+class NullFile:
     "A fake file interface that does nothing"
     def write(self, string):
         "Do not write, do not pass go."
-        pass
 
     def close(self):
         "Having not written, cease."
-        pass
 
 
-class NewDefaultSolver(object):
+class NewDefaultSolver:
     "Creates an environment with a different default solver"
     def __init__(self, solver):
         self.solver = solver
@@ -148,7 +148,7 @@ class NewDefaultSolver(object):
         gpkit.settings["default_solver"] = self.prev_default_solver
 
 
-class StdoutCaptured(object):
+class StdoutCaptured:
     "Puts everything that would have printed to stdout in a log file instead"
     def __init__(self, logfilepath=None):
         self.logfilepath = logfilepath
@@ -158,14 +158,10 @@ class StdoutCaptured(object):
     def __enter__(self):
         "Capture stdout"
         self.original_stdout = sys.stdout
-        self.original_unit_printing = DEFAULT_UNIT_PRINTING[0]
-        DEFAULT_UNIT_PRINTING[0] = ":~"
-        logfile = (open(self.logfilepath, mode="w")
-                   if self.logfilepath else NullFile())
-        sys.stdout = logfile
+        sys.stdout = (open(self.logfilepath, mode="w")
+                      if self.logfilepath else NullFile())
 
     def __exit__(self, *args):
         "Return stdout"
         sys.stdout.close()
-        DEFAULT_UNIT_PRINTING[0] = self.original_unit_printing
         sys.stdout = self.original_stdout

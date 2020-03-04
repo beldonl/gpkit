@@ -1,8 +1,8 @@
 "implements Sankey"
 from collections import defaultdict
 import numpy as np
-from ipysankeywidget import SankeyWidget  # pylint: disable=import-error
 from ipywidgets import Layout
+from ipysankeywidget import SankeyWidget  # pylint: disable=import-error
 from .. import ConstraintSet, Model
 from .. import GeometricProgram, SequentialGeometricProgram
 from ..nomials.math import MonomialEquality
@@ -20,7 +20,7 @@ def getcolor(value):
     return GPCOLORS[0 if value < 0 else 1]
 
 
-class Sankey(object):
+class Sankey:
     "diagrams of sensitivity flow"
     def __init__(self, model):
         self.links = defaultdict(float)
@@ -68,7 +68,7 @@ class Sankey(object):
             if getattr(constrset, "num", None):
                 target += ".%i" % constrset.num
             source = str(key)
-            shortname = (key.str_without(["models"])
+            shortname = (key.str_without(["lineage"])
                          + key.unitstr(into=" [%s]", dimless=" [-]"))
             self.nodes.append({"id": source, "title": shortname})
             self.links[target, source] += value
@@ -77,9 +77,9 @@ class Sankey(object):
                 value = -cost_senss[key]  # sensitivites flow _from_ cost
                 self.links[source, "(objective)"] += value
                 if printing:
-                    print ("(objective) adds %+.3g to the sensitivity"
-                           " of %s" % (-value, key))
-                    print "(objective) is", self.gp.cost, "\n"
+                    print("(objective) adds %+.3g to the sensitivity"
+                          " of %s" % (-value, key))
+                    print("(objective) is", self.gp.cost, "\n")
         for constr in constrset:
             if key not in constr.v_ss:
                 continue
@@ -95,14 +95,14 @@ class Sankey(object):
             else:
                 if constr not in self.constr_name:
                     # use unicode's circled letters for constraint labels
-                    source = unichr(self.counter.next()+9398)
+                    source = chr(self.counter.next()+9398)
                     self.constr_name[constr] = source
                 else:
                     source = self.constr_name[constr]
                 if printing:
-                    print ("%s adds %+.3g to the overall sensitivity of %s"
-                           % (source, value, key))
-                    print source, "is", constr.str_without("units"), "\n"
+                    print("%s adds %+.3g to the overall sensitivity of %s"
+                          % (source, value, key))
+                    print(source, "is", constr.str_without("units"), "\n")
                 if ((isinstance(constr, MonomialEquality)
                      or abs(value) >= INSENSITIVE)
                         and all(len(getattr(p, "hmap", [])) == 1
@@ -139,15 +139,15 @@ class Sankey(object):
             for node in self.nodes:
                 if node["id"] in lookup:
                     # use inverted circled numbers to id the variables...
-                    node["title"] += " " + unichr(0x2776+lookup[node["id"]])
+                    node["title"] += " " + chr(0x2776+lookup[node["id"]])
                 elif "passthrough" in node:
                     cn = node.pop("passthrough")
                     l_idx = lookup[str(cn.left.hmap.keys()[0].keys()[0])]
                     r_idx = lookup[str(cn.right.hmap.keys()[0].keys()[0])]
                     op = {"=": "=", ">=": u"\u2265", "<=": u"\u2264"}[cn.oper]
                     # ...so that e.g. (1) >= (2) can label the constraints
-                    node["title"] = (node["id"]+u"\u2009"+unichr(l_idx+0x2776)
-                                     + op + unichr(r_idx+0x2776))
+                    node["title"] = (node["id"]+u"\u2009"+chr(l_idx+0x2776)
+                                     + op + chr(r_idx+0x2776))
         if flowright:
             r, l = margins["right"], margins["left"]
             margins["left"], margins["right"] = r, l

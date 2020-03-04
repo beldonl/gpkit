@@ -21,8 +21,9 @@ class OnlyVectorParse(Model):
     ---------------------
     x    [-]    just another variable
     """
+    @parse_variables(__doc__, globals())
     def setup(self):
-        exec parse_variables(OnlyVectorParse.__doc__)  # pylint: disable=exec-used
+        pass
 
 
 class Fuselage(Model):
@@ -49,9 +50,9 @@ class Fuselage(Model):
 
     """
 
-    # pylint: disable=undefined-variable, exec-used, invalid-name
+    # pylint: disable=undefined-variable, invalid-name
+    @parse_variables(__doc__, globals())
     def setup(self, Wfueltot):
-        exec parse_variables(self.__doc__)
         return [
             f == l/R/2,
             k >= 1 + 60/f**3 + f/400,
@@ -72,7 +73,6 @@ class TestTools(unittest.TestCase):
         self.assertIsInstance(m.x, NomialArray)
         self.assertEqual(len(m.x), 3)
 
-
     def test_parse_variables(self):
         Fuselage(Variable("Wfueltot", 5, "lbf"))
 
@@ -89,7 +89,7 @@ class TestTools(unittest.TestCase):
         eqns = [L >= 1, W >= 1,
                 L*W == 10]
         N = 4
-        ws = Variable("w_{CO}", ("sweep", np.linspace(1./N, 1-1./N, N)), "-")
+        ws = Variable("w_{CO}", ("sweep", np.linspace(1/N, 1-1/N, N)), "-")
         w_s = Variable("v_{CO}", lambda c: 1-c[ws], "-")
         obj = ws*(L+W) + w_s*(W**-1 * L**-3)
         m = Model(obj, eqns)
@@ -102,14 +102,14 @@ class TestTools(unittest.TestCase):
         """Test Taylor expansion of e^x - 1"""
         x = Variable('x')
         self.assertEqual(te_exp_minus1(x, 1), x)
-        self.assertEqual(te_exp_minus1(x, 3), x + x**2/2. + x**3/6.)
+        self.assertEqual(te_exp_minus1(x, 3), x + x**2/2 + x**3/6)
         self.assertEqual(te_exp_minus1(x, 0), 0)
         # make sure x was not modified
         self.assertEqual(x, Variable('x'))
         # try for VectorVariable too
         y = VectorVariable(3, 'y')
         self.assertEqual(te_exp_minus1(y, 1), y)
-        self.assertEqual(te_exp_minus1(y, 3), y + y**2/2. + y**3/6.)
+        self.assertEqual(te_exp_minus1(y, 3), y + y**2/2 + y**3/6)
         self.assertEqual(te_exp_minus1(y, 0), 0)
         # make sure y was not modified
         self.assertEqual(y, VectorVariable(3, 'y'))
@@ -117,9 +117,9 @@ class TestTools(unittest.TestCase):
     def test_te_secant(self):
         "Test Taylor expansion of secant(var)"
         x = Variable('x')
-        self.assertEqual(te_secant(x, 1), 1 + x**2/2.)
+        self.assertEqual(te_secant(x, 1), 1 + x**2/2)
         a = te_secant(x, 2)
-        b = 1 + x**2/2. + 5*x**4/24.
+        b = 1 + x**2/2 + 5*x**4/24
         self.assertTrue(all([abs(val) <= 1e-10
                              for val in (a.hmap - b.hmap).values()]))  # pylint:disable=no-member
         self.assertEqual(te_secant(x, 0), 1)
@@ -127,9 +127,9 @@ class TestTools(unittest.TestCase):
         self.assertEqual(x, Variable('x'))
         # try for VectorVariable too
         y = VectorVariable(3, 'y')
-        self.assertEqual(te_secant(y, 1), 1 + y**2/2.)
-        self.assertEqual(te_secant(y, 2), 1 + y**2/2. + 5*y**4/24.)
-        self.assertEqual(te_secant(y, 0), 1)
+        self.assertTrue(te_secant(y, 0) == 1)  # truthy bc monomial constraint
+        self.assertTrue(all(te_secant(y, 1) == 1 + y**2/2))
+        self.assertTrue(all(te_secant(y, 2) == 1 + y**2/2 + 5*y**4/24))
         # make sure y was not modified
         self.assertEqual(y, VectorVariable(3, 'y'))
 
@@ -137,14 +137,14 @@ class TestTools(unittest.TestCase):
         "Test Taylor expansion of tangent(var)"
         x = Variable('x')
         self.assertEqual(te_tangent(x, 1), x)
-        self.assertEqual(te_tangent(x, 3), x + x**3/3. + 2*x**5/15.)
+        self.assertEqual(te_tangent(x, 3), x + x**3/3 + 2*x**5/15)
         self.assertEqual(te_tangent(x, 0), 0)
         # make sure x was not modified
         self.assertEqual(x, Variable('x'))
         # try for VectorVariable too
         y = VectorVariable(3, 'y')
         self.assertEqual(te_tangent(y, 1), y)
-        self.assertEqual(te_tangent(y, 3), y + y**3/3. + 2*y**5/15.)
+        self.assertEqual(te_tangent(y, 3), y + y**3/3 + 2*y**5/15)
         self.assertEqual(te_tangent(y, 0), 0)
         # make sure y was not modified
         self.assertEqual(y, VectorVariable(3, 'y'))

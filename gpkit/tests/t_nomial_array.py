@@ -1,7 +1,7 @@
 """Tests for NomialArray class"""
 import unittest
 import numpy as np
-from gpkit import Monomial, Posynomial, NomialArray, VectorVariable
+from gpkit import Variable, Posynomial, NomialArray, VectorVariable, Monomial
 import gpkit
 
 
@@ -13,6 +13,8 @@ class TestNomialArray(unittest.TestCase):
     def test_shape(self):
         x = VectorVariable((2, 3), 'x')
         self.assertEqual(x.shape, (2, 3))
+        self.assertIsInstance(x.str_without(), str)
+        self.assertIsInstance(x.latex(), str)
 
     def test_ndim(self):
         x = VectorVariable((3, 4), 'x')
@@ -20,9 +22,9 @@ class TestNomialArray(unittest.TestCase):
 
     def test_array_mult(self):
         x = VectorVariable(3, 'x', label='dummy variable')
-        x_0 = Monomial('x', idx=(0,), shape=(3,), label='dummy variable')
-        x_1 = Monomial('x', idx=(1,), shape=(3,), label='dummy variable')
-        x_2 = Monomial('x', idx=(2,), shape=(3,), label='dummy variable')
+        x_0 = Variable('x', idx=(0,), shape=(3,), label='dummy variable')
+        x_1 = Variable('x', idx=(1,), shape=(3,), label='dummy variable')
+        x_2 = Variable('x', idx=(2,), shape=(3,), label='dummy variable')
         p = x_0**2 + x_1**2 + x_2**2
         self.assertEqual(x.dot(x), p)
         m = NomialArray([[x_0**2, x_0*x_1, x_0*x_2],
@@ -31,11 +33,11 @@ class TestNomialArray(unittest.TestCase):
         self.assertEqual(x.outer(x), m)
 
     def test_elementwise_mult(self):
-        m = Monomial('m')
+        m = Variable('m')
         x = VectorVariable(3, 'x', label='dummy variable')
-        x_0 = Monomial('x', idx=(0,), shape=(3,), label='dummy variable')
-        x_1 = Monomial('x', idx=(1,), shape=(3,), label='dummy variable')
-        x_2 = Monomial('x', idx=(2,), shape=(3,), label='dummy variable')
+        x_0 = Variable('x', idx=(0,), shape=(3,), label='dummy variable')
+        x_1 = Variable('x', idx=(1,), shape=(3,), label='dummy variable')
+        x_2 = Variable('x', idx=(2,), shape=(3,), label='dummy variable')
         # multiplication with numbers
         v = NomialArray([2, 2, 3]).T
         p = NomialArray([2*x_0, 2*x_1, 3*x_2]).T
@@ -52,24 +54,28 @@ class TestNomialArray(unittest.TestCase):
         # division with monomials
         p2 = NomialArray([x_0/m, x_1/m, x_2/m]).T
         self.assertEqual(x/m, p2)
+        self.assertIsInstance(v.str_without(), str)
+        self.assertIsInstance(v.latex(), str)
+        self.assertIsInstance(p.str_without(), str)
+        self.assertIsInstance(p.latex(), str)
 
     def test_constraint_gen(self):
         x = VectorVariable(3, 'x', label='dummy variable')
-        x_0 = Monomial('x', idx=(0,), shape=(3,), label='dummy variable')
-        x_1 = Monomial('x', idx=(1,), shape=(3,), label='dummy variable')
-        x_2 = Monomial('x', idx=(2,), shape=(3,), label='dummy variable')
+        x_0 = Variable('x', idx=(0,), shape=(3,), label='dummy variable')
+        x_1 = Variable('x', idx=(1,), shape=(3,), label='dummy variable')
+        x_2 = Variable('x', idx=(2,), shape=(3,), label='dummy variable')
         v = NomialArray([1, 2, 3]).T
         p = [x_0, x_1/2, x_2/3]
-        self.assertEqual((x <= v).as_posyslt1(), p)
+        self.assertEqual(list((x <= v).flathmaps({})), [e.hmap for e in p])
 
-    def test_substition(self):
+    def test_substition(self):  # pylint: disable=no-member
         x = VectorVariable(3, 'x', label='dummy variable')
         c = {x: [1, 2, 3]}
         self.assertEqual(x.sub(c), [Monomial({}, e) for e in [1, 2, 3]])
         p = x**2
-        self.assertEqual(p.sub(c), [Monomial({}, e) for e in [1, 4, 9]])
+        self.assertEqual(p.sub(c), [Monomial({}, e) for e in [1, 4, 9]])  # pylint: disable=no-member
         d = p.sum()
-        self.assertEqual(d.sub(c), Monomial({}, 14))
+        self.assertEqual(d.sub(c), Monomial({}, 14))  # pylint: disable=no-member
 
     def test_units(self):
         # inspired by gpkit issue #106
@@ -79,20 +85,6 @@ class TestNomialArray(unittest.TestCase):
         else:
             constraints = (c == 1)
         self.assertEqual(len(constraints), 5)
-
-    def test_left_right(self):
-        x = VectorVariable(10, 'x')
-        xL = x.left
-        xR = x.right
-        self.assertEqual(xL[0], 0)
-        self.assertEqual(xL[1], x[0])
-        self.assertEqual(xR[-1], 0)
-        self.assertEqual(xR[0], x[1])
-        self.assertEqual((xL + xR)[1:-1], x[2:] + x[:-2])
-
-        x = VectorVariable((2, 3), 'x')
-        self.assertRaises(NotImplementedError, lambda: x.left)
-        self.assertRaises(NotImplementedError, lambda: x.right)
 
     def test_sum(self):
         x = VectorVariable(5, 'x')
@@ -133,10 +125,8 @@ class TestNomialArray(unittest.TestCase):
         x = VectorVariable(3, 'x')
         # have to create this using slicing, to get object dtype
         empty_posy_array = x[:0]
-        self.assertEqual(empty_posy_array.sum(), 0)
-        self.assertEqual(empty_posy_array.prod(), 1)
-        self.assertFalse(isinstance(empty_posy_array.sum(), (bool, np.bool_)))
-        self.assertFalse(isinstance(empty_posy_array.prod(), (bool, np.bool_)))
+        self.assertRaises(ValueError, empty_posy_array.sum)
+        self.assertRaises(ValueError, empty_posy_array.prod)
         self.assertEqual(len(empty_posy_array), 0)
         self.assertEqual(empty_posy_array.ndim, 1)
 

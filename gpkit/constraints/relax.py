@@ -2,8 +2,8 @@
 from .set import ConstraintSet
 from ..nomials import Variable, VectorVariable, parse_subs, NomialArray
 from ..keydict import KeyDict
-from .. import NamedVariables, MODELNUM_LOOKUP
-from gpkit import SignomialsEnabled
+from .. import NamedVariables, SignomialsEnabled
+
 
 class ConstraintsRelaxedEqually(ConstraintSet):
     """Relax constraints the same amount, as in Eqn. 10 of [Boyd2007].
@@ -26,20 +26,22 @@ class ConstraintsRelaxedEqually(ConstraintSet):
 
     """
 
-    def __init__(self, constraints):
-        if not isinstance(constraints, ConstraintSet):
-            constraints = ConstraintSet(constraints)
-        substitutions = dict(constraints.substitutions)
-        relconstraints = []
-        self.origconstrs = []
+    def __init__(self, original_constraints):
+        if not isinstance(original_constraints, ConstraintSet):
+            original_constraints = ConstraintSet(original_constraints)
+        self.original_constraints = original_constraints
+        original_substitutions = original_constraints.substitutions
+
         with NamedVariables("Relax"):
             self.relaxvar = Variable("C")
         with SignomialsEnabled():
-            for constraint in constraints.flat(constraintsets=False):
-                self.origconstrs.append(constraint)
-                relconstraints.append(constraint.relaxed(self.relaxvar))
-        ConstraintSet.__init__(self, [relconstraints,
-                                      self.relaxvar >= 1], substitutions)
+            relaxed_constraints = [c.relaxed(self.relaxvar)
+                                   for c in original_constraints.flat()]
+
+        ConstraintSet.__init__(self, {
+            "relaxed constraints": relaxed_constraints,
+            "minimum relaxation": self.relaxvar >= 1}, original_substitutions)
+
 
 class ConstraintsRelaxed(ConstraintSet):
     """Relax constraints, as in Eqn. 11 of [Boyd2007].
@@ -62,21 +64,23 @@ class ConstraintsRelaxed(ConstraintSet):
 
     """
 
-    def __init__(self, constraints):
-        if not isinstance(constraints, ConstraintSet):
-            constraints = ConstraintSet(constraints)
-        substitutions = dict(constraints.substitutions)
-        relconstraints = []
-        self.origconstrs = []
+    def __init__(self, original_constraints):
+        if not isinstance(original_constraints, ConstraintSet):
+            original_constraints = ConstraintSet(original_constraints)
+        self.original_constraints = original_constraints
+        original_substitutions = original_constraints.substitutions
         with NamedVariables("Relax"):
-            self.relaxvars = VectorVariable(len(constraints), "C")
+            self.relaxvars = VectorVariable(len(original_constraints), "C")
+
         with SignomialsEnabled():
-            for i, constraint in enumerate(
-                    constraints.flat(constraintsets=False)):
-                self.origconstrs.append(constraint)
-                relconstraints.append(constraint.relaxed(self.relaxvars[i]))
-        ConstraintSet.__init__(self, [relconstraints,
-                                      self.relaxvars >= 1], substitutions)
+            relaxed_constraints = [
+                c.relaxed(self.relaxvars[i])
+                for i, c in enumerate(original_constraints.flat())]
+
+        ConstraintSet.__init__(self, {
+            "relaxed constraints": relaxed_constraints,
+            "minimum relaxation": self.relaxvars >= 1}, original_substitutions)
+
 
 class ConstantsRelaxed(ConstraintSet):
     """Relax constants in a constraintset.
@@ -86,11 +90,11 @@ class ConstantsRelaxed(ConstraintSet):
     constraints : iterable
         Constraints which will be relaxed (made easier).
 
-    include_only : set
-        if declared, variable names must be on this list to be relaxed
+    include_only : set (optional)
+        variable names must be in this set to be relaxed
 
-    exclude : set
-        if declared, variable names on this list will never be relaxed
+    exclude : set (optional)
+        variable names in this set will never be relaxed
 
 
     Attributes
@@ -103,63 +107,69 @@ class ConstantsRelaxed(ConstraintSet):
         in the final solution than in the original problem. Of course, this
         can also be determined by looking at the constant's new value directly.
     """
-    def __init__(self, constraints, include_only=None, exclude=None):  # pylint:disable=too-many-locals
-        if not isinstance(constraints, ConstraintSet):
-            constraints = ConstraintSet(constraints)
+    # pylint:disable=too-many-locals
+    def __init__(self, constraints, *, include_only=None, exclude=None):
         exclude = frozenset(exclude) if exclude else frozenset()
         include_only = frozenset(include_only) if include_only else frozenset()
+        with NamedVariables("Relax") as (self.lineage, _):
+            pass  # gives this model the correct lineage.
+
+        if not isinstance(constraints, ConstraintSet):
+            constraints = ConstraintSet(constraints)
         substitutions = KeyDict(constraints.substitutions)
         constants, _, linked = parse_subs(constraints.varkeys, substitutions)
-        constrained_varkeys = constraints.constrained_varkeys()
         if linked:
             kdc = KeyDict(constants)
-            combined = {k: f(kdc) for k, f in linked.items()
-                        if k in constrained_varkeys}
-            combined.update({k: v for k, v in constants.items()
-                             if k in constrained_varkeys})
-        else:
-            combined = constants
-        self.constants = KeyDict(combined)
-        relaxvars, relaxation_constraints = [], []
-        self.origvars = []
-        self.num = MODELNUM_LOOKUP["Relax"]
-        self._unrelaxmap = {}
-        MODELNUM_LOOKUP["Relax"] += 1
-        for key, value in combined.items():
-            if value == 0:
+            constrained_varkeys = constraints.constrained_varkeys()
+            constants.update({k: f(kdc) for k, f in linked.items()
+                              if k in constrained_varkeys})
+
+        self._derelax_map = {}
+        relaxvars, self.freedvars, relaxation_constraints = [], [], {}
+        for const, val in sorted(constants.items(), key=lambda i: i[0].eqstr):
+            if val == 0:
                 continue
-            elif include_only and key.name not in include_only:
+            if include_only and const.name not in include_only:
                 continue
-            elif key.name in exclude:
+            if const.name in exclude:
                 continue
-            key.descr.pop("gradients", None)
-            descr = key.descr.copy()
-            descr.pop("value", None)
-            descr.pop("veckey", None)
-            descr["models"] = descr.pop("models", [])+["Relax"]
-            descr["modelnums"] = descr.pop("modelnums", []) + [self.num]
-            relaxvardescr = descr.copy()
-            relaxvardescr["unitrepr"] = "-"
-            relaxvar = Variable(**relaxvardescr)
+            # set up the lineage
+            const.descr.pop("gradients", None)  # nothing wants an old gradient
+            newconstd = const.descr.copy()
+            newconstd.pop("veckey", None)  # only const wants an old veckey
+            # everything but const wants a new lineage, to distinguish them
+            newconstd["lineage"] = (newconstd.pop("lineage", ())
+                                    + (self.lineage[-1],))
+            # make the relaxation variable, free to get as large as it needs
+            relaxedd = newconstd.copy()
+            relaxedd["unitrepr"] = "-"  # and unitless, importantly
+            relaxvar = Variable(**relaxedd)
             relaxvars.append(relaxvar)
-            del substitutions[key]
-            var = Variable(**key.descr)
-            self.origvars.append(var)
-            unrelaxeddescr = descr.copy()
-            unrelaxeddescr["name"] += "_{before}"
-            unrelaxed = Variable(**unrelaxeddescr)
-            self._unrelaxmap[unrelaxed.key] = key
-            substitutions[unrelaxed] = value
-            relaxation_constraints.append([relaxvar >= 1,
-                                           unrelaxed/relaxvar <= var,
-                                           var <= unrelaxed*relaxvar])
-        self.relaxvars = NomialArray(relaxvars)
-        ConstraintSet.__init__(self, [constraints, relaxation_constraints])
+            # the newly freed const can acquire a new value
+            del substitutions[const]
+            freed = Variable(**const.descr)
+            self.freedvars.append(freed)
+            # becuase the make the newconst will take its old value
+            newconstd["lineage"] += (("OriginalValues", 0),)
+            newconst = Variable(**newconstd)
+            substitutions[newconst] = val
+            self._derelax_map[newconst.key] = const
+            # add constraints so the newly freed's wiggle room
+            # is proportional to the value relaxvar, and it can't antirelax
+            relaxation_constraints[str(const)] = [relaxvar >= 1,
+                                                  newconst/relaxvar <= freed,
+                                                  freed <= newconst*relaxvar]
+        ConstraintSet.__init__(self, {
+            "original constraints": constraints,
+            "relaxation constraints": relaxation_constraints})
+        self.relaxvars = NomialArray(relaxvars)  # so they can be .prod()'d
         self.substitutions = substitutions
+        self.constants = constants
 
     def process_result(self, result):
+        "Transfers the constant sensitivities back to the original constants"
         ConstraintSet.process_result(self, result)
-        csenss = result["sensitivities"]["constants"]
-        for const, origvar in self._unrelaxmap.items():
-            csenss[origvar] = csenss[const]
-            del csenss[const]
+        constant_senss = result["sensitivities"]["variables"]
+        for new_constant, former_constant in self._derelax_map.items():
+            constant_senss[former_constant] = constant_senss[new_constant]
+            del constant_senss[new_constant]
